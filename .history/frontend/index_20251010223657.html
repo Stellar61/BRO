@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bus Route Optimizer</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f6f8;
+        margin: 0;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      h1 {
+        color: #333;
+      }
+      input,
+      button {
+        padding: 10px;
+        margin: 8px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+      }
+      button {
+        background-color: #0078d4;
+        color: white;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #005a9e;
+      }
+      pre {
+        background: #fff;
+        padding: 15px;
+        border-radius: 5px;
+        width: 80%;
+        max-width: 600px;
+        overflow-x: auto;
+        box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🚌 Bus Route Optimization</h1>
+    <p>Enter a route number to get the optimized stop sequence:</p>
+    <input id="route" type="number" placeholder="Enter Route No" />
+    <button onclick="getOptimizedRoute()">Optimize Route</button>
+    <div id="output"></div>
+
+    <script>
+      async function getOptimizedRoute() {
+        const routeNo = document.getElementById("route").value;
+        if (!routeNo) {
+          alert("Please enter a route number!");
+          return;
+        }
+
+        const response = await fetch("http://127.0.0.1:8000/optimize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ route_no: parseInt(routeNo) }),
+        });
+
+        const data = await response.json();
+        document.getElementById(
+          "output"
+        ).innerHTML = `<h3>Optimized Route:</h3><pre>${JSON.stringify(
+          data,
+          null,
+          2
+        )}</pre>`;
+      }
+    </script>
+  </body>
+</html>

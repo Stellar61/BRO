@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bus Route Optimizer</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 30px;
+      }
+      h1 {
+        color: #2c3e50;
+      }
+      input,
+      button {
+        padding: 6px;
+        font-size: 16px;
+      }
+      table {
+        border-collapse: collapse;
+        margin-top: 20px;
+        width: 100%;
+        max-width: 900px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background: #f4f4f4;
+      }
+      #map {
+        height: 500px;
+        width: 100%;
+        margin-top: 20px;
+        border-radius: 8px;
+        border: 2px solid #ddd;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>🚌 Bus Route Optimizer</h1>
+
+    <form id="optimizeForm">
+      <label>Enter Route No: </label>
+      <input type="number" id="routeNo" required />
+      <button type="submit">Optimize</button>
+    </form>
+
+    <div id="loading" style="display: none">Calculating best route...</div>
+    <div id="result"></div>
+
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <script>
+      const API_URL = `${window.location.protocol}//${window.location.hostname}:8000`;
+      let map, routeLayer;
+
+      // Initialize the map
+      function initMap() {
+        map = L.map("map").setView([13.0827, 80.2707], 11); // Default view (Chennai)
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 18,
+          attribution: "© OpenStreetMap contributors",
+        }).addTo(map);
+      }
+
+      // Draw route on map
+      function drawRoute(stops) {
+        if (routeLayer) map.removeLayer(routeLayer);
+
+        const latlngs = stops.map((s) => [s.lat, s.lon]);
+
+        routeLayer = L.layerGroup();
+
+        // Add markers
+        latlngs.forEach((point, i) => {
+          const marker = L.marker(point).bindPopup(
+            `<b>Stop ${i + 1}</b><br>${stops[i]["Boarding Point"]}`
+          );
+          routeLayer.addLayer(marker);
+        });
+
+        // Draw polyline connecting stops
+        const polyline = L.polyline(latlngs, { color: "blue", weight: 4 });
+        routeLayer.addLayer(polyline);
+        routeLayer.addTo(map);
+
+        // Adjust map view
+        map.fitBounds(polyline.getBounds());
+      }
+
+      // Handle form submit
+      document
+        .getElementById("optimizeForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const routeNo = document.getElementById("routeNo").value;
+          document.getElementById("loading").style.display = "block";
+          document.getElementById("result").innerHTML = "";
+          if (routeLayer) map.removeLayer(routeLayer);
+
+          try {
+            const response = await fetch(`${API_URL}/optimize`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ route_no: Number(routeNo) }),
+            });
+
+            if (!response.ok) throw new Error("Backend error");
+            const data = await response.json();
+            document.getElementById("loading").style.display = "none";
+
+            if (data.error) {
+              document.getElementById(
+                "result"
+              ).innerHTML = `<p style="color:red;">⚠️ ${data.error}</p>`;
+              return;
+            }
+
+            // Display table
+            let html = `
+          <h2>Optimized Route #${data.route_no}</h2>
+          <p><b>Total Distance:</b> ${data.total_distance_km ?? 0} km</p>
+          <p><b>Estimated Time:</b> ${data.estimated_time_min ?? 0} minutes</p>
+          <table>
+            <tr><th>Order</th><th>Stop Name</th><th>Latitude</th><th>Longitude</th><th>Time</th></tr>
+        `;
+
+            data.optimized_order.forEach((stop, idx) => {
+              html += `
+            <tr>
+              <td>${idx + 1}</td>
+              <td>${stop["Boarding Point"]}</td>
+              <td>${stop.lat}</td>
+              <td>${stop.lon}</td>
+              <td>${stop.Time}</td>
+            </tr>
+          `;
+            });
+
+            html += "</table>";
+            document.getElementById("result").innerHTML = html;
+
+            // Draw route on map
+            drawRoute(data.optimized_order);
+          } catch (err) {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById(
+              "result"
+            ).innerHTML = `<p style="color:red;">Error connecting to backend. Make sure it's running on port 8000.</p>`;
+            console.error(err);
+          }
+        });
+
+      // Initialize map on load
+      window.onload = initMap;
+    </script>
+  </body>
+</html>
